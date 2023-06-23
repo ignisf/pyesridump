@@ -4,6 +4,7 @@ from six.moves import urllib
 import logging
 import json
 import sys
+import os
 
 from esridump import EsriDumper
 
@@ -84,6 +85,7 @@ def _parse_args(args):
     return parser.parse_args(args)
 
 def main():
+    command = os.path.basename(sys.argv[0])
     args = _parse_args(sys.argv[1:])
     headers = _collect_headers(args.headers)
     params = _collect_params(args.params)
@@ -106,14 +108,29 @@ def main():
         timeout=args.timeout,
         max_page_size=args.max_page_size,
         parent_logger=logger,
-        paginate_oid=args.paginate_oid)
+        paginate_oid=args.paginate_oid,
+        mode=command)
 
-    if args.jsonlines:
-        for feature in dumper:
-            args.outfile.write(json.dumps(feature))
-            args.outfile.write('\n')
-    else:
-        args.outfile.write('{"type":"FeatureCollection","features":[\n')
+    if command == 'esri2geojson':
+        if args.jsonlines:
+            for feature in dumper:
+                args.outfile.write(json.dumps(feature))
+                args.outfile.write('\n')
+        else:
+            args.outfile.write('{"type":"FeatureCollection","features":[\n')
+            feature_iter = iter(dumper)
+            try:
+                feature = next(feature_iter)
+                while True:
+                    args.outfile.write(json.dumps(feature))
+                    feature = next(feature_iter)
+                    args.outfile.write(',\n')
+            except StopIteration:
+                args.outfile.write('\n')
+                args.outfile.write(']}')
+    elif command == 'esri2esri':
+        args.outfile.write(json.dumps(dumper.get_esri_headers(query_fields=requested_fields))[:-1])
+        args.outfile.write(',"features":[\n')
         feature_iter = iter(dumper)
         try:
             feature = next(feature_iter)
@@ -123,7 +140,10 @@ def main():
                 args.outfile.write(',\n')
         except StopIteration:
             args.outfile.write('\n')
-        args.outfile.write(']}')
+            args.outfile.write(']}')
+    else:
+        print(command)
+        print("Try esri2geojson or esri2esri")
 
 if __name__ == '__main__':
     main()

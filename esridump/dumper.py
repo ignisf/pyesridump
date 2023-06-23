@@ -16,7 +16,8 @@ class EsriDumper(object):
                  start_with=None, geometry_precision=None,
                  paginate_oid=False,
                  max_page_size=None,
-                 pause_seconds=10, requests_to_pause=5, num_of_retry=5):
+                 pause_seconds=10, requests_to_pause=5, num_of_retry=5,
+                 mode="esri2geojson"):
         self._layer_url = url
         self._query_params = extra_query_args or {}
         self._headers = extra_headers or {}
@@ -33,6 +34,8 @@ class EsriDumper(object):
         self._pause_seconds = pause_seconds
         self._requests_to_pause = requests_to_pause
         self._num_of_retry = num_of_retry
+
+        self._mode = mode
 
         if parent_logger:
             self._logger = parent_logger.getChild('esridump')
@@ -137,6 +140,22 @@ class EsriDumper(object):
             return False
 
         return data.get('error') and data['error']['message'] != "Failed to execute query."
+
+    def get_esri_headers(self, query_fields):
+        query_args = self._build_query_args({
+            'resultRecordCount': '1',
+            'where': '1=1',
+            'geometryPrecision': self._precision,
+            'returnGeometry': self._request_geometry,
+            'outSR': self._outSR,
+            'outFields': ','.join(query_fields or ['*']),
+            'f': 'json',
+        })
+        headers = self._build_headers()
+        url = self._build_url('/query')
+        response = self._request('POST', url, params=query_args, headers=headers)
+        esri_json = self._handle_esri_errors(response, "Could not retrieve layer esri header")
+        return {i:esri_json[i] for i in esri_json if i!='features' and i!='exceededTransferLimit'}
 
     def get_metadata(self):
         query_args = self._build_query_args({
@@ -465,5 +484,9 @@ class EsriDumper(object):
 
             features = data.get('features')
 
-            for feature in features:
-                yield esri2geojson(feature)
+            if self._mode == 'esri2geojson':
+                for feature in features:
+                    yield esri2geojson(feature)
+            elif self._mode == 'esri2esri':
+                for feature in features:
+                    yield feature

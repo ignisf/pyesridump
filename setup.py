@@ -22,6 +22,6 @@ setup(
         'six',
     ],
     entry_points={
-        'console_scripts': ['esri2geojson=esridump.cli:main'],
+        'console_scripts': ['esri2geojson=esridump.cli:main','esri2esri=esridump.cli:main'],
     }
 )
