@@ -482,11 +482,14 @@ class EsriDumper(object):
             if error:
                 raise EsriDownloadError("Problem querying ESRI dataset with args {}. Server said: {}".format(query_args, error['message']))
 
-            features = data.get('features')
+            if self._mode == 'esri2vrt':
+                yield {'query_index': query_index, 'data': data}
+            else:
+                features = data.get('features')
 
-            if self._mode == 'esri2geojson':
-                for feature in features:
-                    yield esri2geojson(feature)
-            elif self._mode == 'esri2esri':
-                for feature in features:
-                    yield feature
+                if self._mode == 'esri2geojson':
+                    for feature in features:
+                        yield esri2geojson(feature)
+                elif self._mode == 'esri2esri':
+                    for feature in features:
+                        yield feature

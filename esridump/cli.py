@@ -5,6 +5,7 @@ import logging
 import json
 import sys
 import os
+import zipfile
 
 from esridump import EsriDumper
 
@@ -141,9 +142,27 @@ def main():
         except StopIteration:
             args.outfile.write('\n')
             args.outfile.write(']}')
+    elif command == 'esri2vrt':
+        vrt_file_name = args.outfile.name
+        vrt_layer_prefix = os.path.splitext(os.path.basename(vrt_file_name))[0]
+        vrt_package_name = f'{vrt_layer_prefix}.zip'
+
+        file_iter = iter(dumper)
+        i = 0
+        args.outfile.write(f"<OGRVRTDataSource>\n  <OGRVRTUnionLayer name=\"{vrt_layer_prefix}\"\">\n")
+        with zipfile.ZipFile(vrt_package_name, mode='w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as vrtzip:
+            try:
+                file_data = next(file_iter)
+                while True:
+                    vrtzip.writestr(f"{vrt_layer_prefix}-{file_data['query_index']}.json", json.dumps(file_data['data']))
+                    args.outfile.write(f"    <OGRVRTLayer name=\"{vrt_layer_prefix}-{file_data['query_index']}\"><SrcDataSource>/vsizip/{vrt_package_name}/{vrt_layer_prefix}-{file_data['query_index']}.json</SrcDataSource></OGRVRTLayer>\n")
+                    file_data = next(file_iter)
+            except (StopIteration, KeyboardInterrupt):
+                args.outfile.write("</OGRVRTUnionLayer>\n</OGRVRTDataSource>\n")
+
     else:
         print(command)
-        print("Try esri2geojson or esri2esri")
+        print("Try esri2geojson or esri2esri or esri2vrt")
 
 if __name__ == '__main__':
     main()
